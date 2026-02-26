@@ -28,52 +28,43 @@ AGENTS = {
     "lex": {
         "token": LEX_TOKEN,
         "name": "Lex Arbitrum",
-        "system": """You are Lex Arbitrum, a sharp regulatory and legal agent participating in a live meeting via Telegram.
+        "system": """You are Lex Arbitrum, a regulatory and legal agent in a live meeting Telegram feed.
 
-Your role: Analyse what is being said through the lens of regulation, law, governance, and compliance — particularly Bermuda's Digital Asset Business Act (DABA), BMA requirements, and broader financial services regulation.
-
-Your style:
-- Concise and precise — 2-4 sentences maximum per response
-- Flag regulatory risks, obligations, or opportunities immediately
-- Reference specific legislation or frameworks when relevant
-- Use plain language — no unnecessary jargon
-- Occasionally push back on commercial or contrarian views with legal reality
-
-You are commenting in real time on a live meeting transcript. Stay sharp and relevant.""",
+STRICT RULES:
+- DEFAULT: 1 sentence only. Sharp and specific.
+- OCCASIONALLY (when the point genuinely requires it): up to 3-5 sentences max.
+- Never repeat a point already made in this conversation.
+- Never echo what Vera or Dante just said.
+- React ONLY to what was just said. Move on when the topic moves on.
+- Reference DABA, BMA, or law only when directly relevant.""",
         "emoji": "⚖️"
     },
     "vera": {
         "token": VERA_TOKEN,
         "name": "Vera Capita",
-        "system": """You are Vera Capita, a commercial and deal structure agent participating in a live meeting via Telegram.
+        "system": """You are Vera Capita, a commercial agent in a live meeting Telegram feed.
 
-Your role: Analyse what is being said through a commercial lens — deal structure, revenue models, market opportunity, partnerships, and financial viability.
-
-Your style:
-- Pragmatic and deal-focused — 2-4 sentences maximum per response
-- Identify commercial opportunities or risks quickly
-- Think about incentives, economics, and who benefits
-- Challenge assumptions that don't stack up commercially
-- Occasionally push back on regulatory or contrarian views with market reality
-
-You are commenting in real time on a live meeting transcript. Stay sharp and relevant.""",
+STRICT RULES:
+- DEFAULT: 1 sentence only. Punchy and practical.
+- OCCASIONALLY (when the point genuinely requires it): up to 3-5 sentences max.
+- Never repeat a point already made in this conversation.
+- Never echo what Lex or Dante just said.
+- React ONLY to what was just said. Move on when the topic moves on.
+- Focus on deal structure, revenue, or market opportunity.""",
         "emoji": "💼"
     },
     "dante": {
         "token": DANTE_TOKEN,
         "name": "Dante Contrario",
-        "system": """You are Dante Contrario, a devil's advocate agent participating in a live meeting via Telegram.
+        "system": """You are Dante Contrario, a devil's advocate in a live meeting Telegram feed.
 
-Your role: Challenge every assumption. Find the weakness in every argument. Ask the uncomfortable question nobody else is asking.
-
-Your style:
-- Provocative but intelligent — 2-4 sentences maximum per response
-- Never accept the premise at face value
-- Find the flaw, the gap, the unintended consequence
-- Play contrarian even when you might privately agree
-- Occasionally wind up Lex and Vera with pointed observations
-
-You are commenting in real time on a live meeting transcript. Stay sharp and contrarian.""",
+STRICT RULES:
+- DEFAULT: 1 sentence only. Provocative and intelligent.
+- OCCASIONALLY (when the point genuinely requires it): up to 3-5 sentences max.
+- Never repeat a point already made — especially your own previous points.
+- Never echo what Lex or Vera just said.
+- React ONLY to what was just said. Drop old topics completely.
+- Find a fresh angle every time.""",
         "emoji": "😈"
     }
 }
@@ -96,25 +87,32 @@ def send_telegram(token: str, text: str):
     except Exception as e:
         print(f"Telegram send error: {e}")
 
-def get_agent_response(agent_key: str, new_segment: str) -> str:
+def get_agent_response(agent_key: str, new_segment: str, prior_responses: dict) -> str:
     """Ask Claude to respond as a given agent persona."""
     agent = AGENTS[agent_key]
     
-    # Build context from buffer
-    context = "\n".join([f"{s['speaker']}: {s['text']}" for s in transcript_buffer[-10:]])
+    # Only use last 3 segments — keeps agents focused on NOW
+    context = "\n".join([f"{s['speaker']}: {s['text']}" for s in transcript_buffer[-3:]])
     
-    user_message = f"""Live meeting transcript context (last few exchanges):
+    # Show what other agents already said so this agent doesn't repeat them
+    other_responses = "\n".join([
+        f"{AGENTS[k]['name']}: {v}"
+        for k, v in prior_responses.items()
+        if k != agent_key and v
+    ])
+    other_context = f"\nOther agents already said:\n{other_responses}\n" if other_responses else ""
+
+    user_message = f"""Recent transcript:
 {context}
 
-Latest segment just spoken:
-{new_segment}
-
-Respond as {agent['name']} in 2-4 sentences. Be sharp and relevant to what was just said."""
+Just said: {new_segment}
+{other_context}
+Respond as {agent['name']}. DEFAULT to 1 sentence. Take a fresh angle — don't repeat anything above."""
 
     try:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=200,
+            max_tokens=120,
             system=agent["system"],
             messages=[{"role": "user", "content": user_message}]
         )
@@ -124,19 +122,24 @@ Respond as {agent['name']} in 2-4 sentences. Be sharp and relevant to what was j
         return None
 
 def agents_respond(segment_text: str, speaker: str):
-    """Have all three agents respond with staggered timing."""
+    """Have all three agents respond with staggered timing, sharing prior responses."""
     
-    # Stagger agent responses so it feels like a natural conversation
-    delays = {"lex": 3, "vera": 8, "dante": 14}
-    
+    delays = {"lex": 5, "vera": 18, "dante": 32}
+    prior_responses = {}  # Accumulates as each agent responds
+    lock = threading.Lock()
+
     def respond(agent_key, delay):
         time.sleep(delay)
-        response = get_agent_response(agent_key, segment_text)
+        with lock:
+            snapshot = dict(prior_responses)
+        response = get_agent_response(agent_key, segment_text, snapshot)
         if response:
+            with lock:
+                prior_responses[agent_key] = response
             agent = AGENTS[agent_key]
             message = f"{agent['emoji']} *{agent['name']}*\n{response}"
             send_telegram(agent["token"], message)
-    
+
     for agent_key, delay in delays.items():
         t = threading.Thread(target=respond, args=(agent_key, delay))
         t.daemon = True
@@ -144,8 +147,8 @@ def agents_respond(segment_text: str, speaker: str):
 
 # ── Webhook endpoint ──────────────────────────────────────────────────────────
 @app.route("/webhook", methods=["POST"])
-def fireflies_webhook():
-    """Receive transcript segments from Fireflies."""
+def deepgram_webhook():
+    """Receive real-time transcript segments from Deepgram via local listen.py."""
     data = request.json
     
     if not data:
@@ -153,13 +156,13 @@ def fireflies_webhook():
     
     print(f"Webhook received: {data}")
     
-    # Fireflies sends different event types
+    # listen.py posts TranscriptSegment events
     event_type = data.get("eventType", "")
     
-    # Handle transcript_ready or real-time segment events
+    # Handle real-time segment events from Deepgram
     if event_type in ["Transcription", "TranscriptSegment", "transcript_ready"]:
         
-        # Extract transcript data (Fireflies format)
+        # Extract transcript data (Deepgram format via listen.py)
         transcript = data.get("transcript", {})
         sentences = transcript.get("sentences", [])
         
