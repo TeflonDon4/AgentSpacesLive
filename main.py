@@ -1,8 +1,8 @@
 """
 AgentSpaces Live
 ----------------
-Receives Fireflies transcript webhooks and routes them to
-Lex, Vera, and Dante — three AI agents debating in a Telegram group.
+Receives real-time transcript segments from Deepgram (via local listen.py)
+and routes them to Lex, Vera, and Dante — three AI agents debating in a Telegram group.
 """
 
 import os
