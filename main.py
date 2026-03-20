@@ -7,7 +7,7 @@ Bermuda Business Development Authority.
 Agents:
   Lex Arbitrum    ⚖️  — Bermuda regulatory lens
   Vera Capita     💼  — Commercial & business case
-  Dante Contrario 😈  — Devil's advocate
+  Neil Underwriter  🔍  — Insurance executive, AI practitioner
   Marco Ventures  💰  — Investor voice
 
 Persistent memory: running conversation summary injected into
