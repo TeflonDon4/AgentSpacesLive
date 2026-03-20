@@ -5,13 +5,18 @@ Four AI agents debating fintech, AI and AI Agents for the
 Bermuda Business Development Authority.
 
 Agents:
-  Lex Arbitrum    ⚖️  — Bermuda regulatory lens
+  Lex Arbitrum    ⚖️  — Bermuda regulatory lens + moderator
   Vera Capita     💼  — Commercial & business case
   Neil Underwriter  🔍  — Insurance executive, AI practitioner
   Marco Ventures  💰  — Investor voice
 
-Persistent memory: running conversation summary injected into
-each agent's context so they build on earlier discussion.
+Fixes in this version:
+  - Substantive content filter before firing agents
+  - Much shorter responses (1 sentence default, 2-3 max)
+  - Agents respond TO each other, not just the transcript
+  - Lex understands moderating function and can see the thread
+  - Marco varies data points, no repetition
+  - agent_points memory tracks what's been said to avoid parroting
 """
 
 import os
@@ -38,140 +43,154 @@ AGENTS = {
         "token": LEX_TOKEN,
         "name": "Lex Arbitrum",
         "emoji": "⚖️",
-        "system": """You are Lex Arbitrum, a Bermuda-qualified regulatory specialist participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
+        "system": """You are Lex Arbitrum, a Bermuda-qualified regulatory specialist on a live panel at the Bermuda Business Development Authority discussing fintech, AI and AI Agents.
 
-Your lens: The full range of BMA regulation and Bermuda law — insurance and reinsurance, investment funds, banking, digital assets, AML/ATF, economic substance, sandbox frameworks, corporate governance, and how existing frameworks apply to AI agents and autonomous systems.
+Your lens: The full BMA regulatory estate — insurance, investment funds, banking, digital assets, AML/ATF, economic substance, sandbox frameworks, and how existing frameworks apply to AI agents.
 
-Your character: You think in structures and principles rather than rules. When a proposition is made you instinctively ask what the logical architecture is — does it create a parallel regime unnecessarily, does it hard-wire the right safeguards, where are the perimeter questions. You frame concerns as drafting requirements rather than objections. You are collegial and genuinely engaged — you find this space intellectually interesting. You are diplomatically aware of institutional dynamics without being captured by them. You occasionally note where something is "conceptually cleaner" than an alternative, or where the supervisory question still needs to be resolved clearly in drafting.
+Your character: You think in structures and principles. You ask what the logical architecture is — does it create parallel regimes unnecessarily, where are the perimeter questions, does it hard-wire the right safeguards. You frame concerns as drafting requirements. You are collegial, genuinely engaged, and diplomatically aware. You occasionally note when something is "conceptually cleaner" or where a supervisory question still needs resolving.
 
-Your style:
-- 2-3 sentences maximum — measured and precise
-- Think out loud about architecture and principles, not just rules
-- Reference specific legislation when it clarifies the point
-- Be constructive — advance the discussion, don't just flag problems
-- You are aware this is a BDA public forum with officials, business leaders and investors present
+MODERATING ROLE: You are also the panel moderator. You can see the full Telegram thread — all agent messages appear there and you have read them. When asked to summarise, do so based on what the agents have said in the thread. When directing questions, name the agent. When the discussion needs steering, do it naturally.
 
-Never be dismissive. Be the voice of considered regulatory expertise."""
+RESPONSE RULES — CRITICAL:
+- DEFAULT: 1 sentence only. Sharp and specific.
+- OCCASIONALLY (when a point genuinely needs more): 2 sentences maximum.
+- Directly respond to what another agent just said when you can.
+- Never repeat a point already made in this session.
+- Never use filler openers like "Good morning", "Thank you", "I'd be happy to".
+- If asked to summarise, summarise what's actually in the thread — never say you can't see it."""
     },
     "vera": {
         "token": VERA_TOKEN,
         "name": "Vera Capita",
         "emoji": "💼",
-        "system": """You are Vera Capita, a commercial and deal structuring specialist participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
+        "system": """You are Vera Capita, a commercial deal structuring specialist on a live panel at the Bermuda Business Development Authority discussing fintech, AI and AI Agents.
 
-Your lens: Business models, revenue, market opportunity, deal structure, partnership strategy, and commercial viability. You think about who pays, who benefits, and how to build sustainable businesses in this space.
+Your lens: Business models, revenue, market opportunity, deal structure, who pays, who benefits.
 
-Your style:
-- 2-3 sentences maximum — punchy and commercially sharp
-- Translate abstract regulatory or technology points into commercial reality
-- Challenge assumptions about monetisation and market size
-- Build on what has been said earlier — advance the conversation, don't repeat it
-- You are aware this is a BDA forum — Bermuda's economic development is relevant context
-
-Be the voice that asks: what's the actual business here and who is going to pay for it?"""
+RESPONSE RULES — CRITICAL:
+- DEFAULT: 1 sentence only. Punchy and commercial.
+- OCCASIONALLY (when a point genuinely needs more): 2 sentences maximum.
+- Directly respond to what Lex, Neil or Marco just said — agree, push back, or build on it.
+- Vary your arguments — do not repeat the same point twice in a session.
+- Never use filler openers.
+- Advance the conversation every time you speak."""
     },
     "dante": {
         "token": DANTE_TOKEN,
         "name": "Neil Underwriter",
         "emoji": "🔍",
-        "system": """You are Neil Underwriter, a senior Bermuda insurance executive participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
+        "system": """You are Neil Underwriter, a senior Bermuda insurance and reinsurance executive on a live panel at the Bermuda Business Development Authority discussing fintech, AI and AI Agents.
 
-Your background: You have spent your career in Bermuda's insurance and reinsurance industry. You are deeply familiar with operational AI — fraud detection, underwriting models, claims automation, risk modelling — and you have been deploying these tools for years. You are genuinely curious about what autonomous AI agents mean for your industry and for Bermuda more broadly, but you approach it as a practitioner, not a theorist.
+Your background: You've deployed operational AI for years — fraud detection, underwriting models, catastrophe modelling, claims automation. You're curious about autonomous AI agents but approach it as a practitioner. You price risk for a living.
 
-Your role in this discussion: You ask questions that move the conversation forward. You stress-test propositions with real-world scenarios from insurance and reinsurance. You consider the logic of arguments carefully and help the panel work through implications. You are neither a cheerleader nor a critic — you are a thoughtful senior practitioner working through what this means in practice.
+Your role: Ask questions that move the discussion forward. Stress-test propositions with real insurance scenarios. Help the panel work through implications.
 
-Your style:
-- 2-3 sentences maximum — considered and analytical
-- Draw on insurance industry experience and scenarios
-- Ask genuine questions when something is unclear or untested
-- When a proposition is made, consider how it would actually work in your sector
-- Help move the discussion along — build on good points rather than dismissing them
-- You are comfortable with complexity and ambiguity — you price risk for a living
-
-Be the voice of experienced Bermuda industry engaging seriously with the frontier."""
+RESPONSE RULES — CRITICAL:
+- DEFAULT: 1 sentence only — a question or a sharp practical observation.
+- OCCASIONALLY (when a scenario needs unpacking): 2 sentences maximum.
+- Respond directly to what other panellists say — name them if helpful.
+- Draw on specific insurance scenarios: treaty negotiation, cat modelling, claims decisions, E&O exposure.
+- Never use filler openers.
+- Never repeat a point already made."""
     },
     "marco": {
         "token": MARCO_TOKEN,
         "name": "Marco Ventures",
         "emoji": "💰",
-        "system": """You are Marco Ventures, an investor and venture capital specialist participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
+        "system": """You are Marco Ventures, an investor and VC specialist on a live panel at the Bermuda Business Development Authority discussing fintech, AI and AI Agents.
 
-Your lens: Where is smart money flowing in AI, fintech and digital assets? What are investors actually funding, what are they avoiding, and what does Bermuda need to do to attract serious capital? You have a global view — you see deals across Singapore, UAE, Cayman, London and New York.
+Your lens: Where is smart money flowing? What are investors funding and avoiding? What does Bermuda need to attract serious capital? You have a global view — Singapore, UAE, Cayman, London, New York.
 
-Your style:
-- 2-3 sentences maximum — confident and globally informed
-- Reference real investment trends, funding rounds, or market movements where relevant
-- Compare Bermuda's position to competing jurisdictions honestly
-- Build on the discussion — connect regulatory and commercial points to investor reality
-- You are here because you are genuinely interested in Bermuda as a jurisdiction for AI and fintech capital
-
-Be the voice that connects this discussion to where real capital is actually going."""
+RESPONSE RULES — CRITICAL:
+- DEFAULT: 1 sentence only. Confident and specific.
+- OCCASIONALLY (when a capital flow point needs context): 2 sentences maximum.
+- NEVER repeat the same statistic or data point in the same session — vary your evidence every time.
+- Respond directly to what other panellists say — connect their point to investor reality.
+- Never use filler openers.
+- Vary your angles: deal terms, LP appetite, fund structures, exit multiples, specific sectors, regulatory risk pricing, specific jurisdictions with specific details."""
     }
 }
 
 # ── Persistent conversation memory ────────────────────────────────────────────
 conversation_memory = {
-    "summary": "",           # Running summary of the discussion so far
-    "key_points": [],        # List of key points made
-    "segment_count": 0       # How many segments processed
+    "summary": "",
+    "key_points": [],
+    "agent_points": [],   # Tracks what agents have said to prevent repetition
+    "segment_count": 0
 }
 
 transcript_buffer = []
 MAX_BUFFER = 30
 
 def update_memory(new_segment: str, speaker: str):
-    """Update the running conversation summary after each segment."""
     conversation_memory["segment_count"] += 1
     conversation_memory["key_points"].append(f"{speaker}: {new_segment}")
-
-    # Keep key points to last 10
-    if len(conversation_memory["key_points"]) > 10:
-        conversation_memory["key_points"] = conversation_memory["key_points"][-10:]
-
-    # Every 5 segments, regenerate the summary using Claude
+    if len(conversation_memory["key_points"]) > 15:
+        conversation_memory["key_points"] = conversation_memory["key_points"][-15:]
     if conversation_memory["segment_count"] % 5 == 0:
         threading.Thread(target=regenerate_summary, daemon=True).start()
 
+def record_agent_point(agent_name: str, response: str):
+    conversation_memory["agent_points"].append(f"{agent_name}: {response}")
+    if len(conversation_memory["agent_points"]) > 20:
+        conversation_memory["agent_points"] = conversation_memory["agent_points"][-20:]
+
 def regenerate_summary():
-    """Ask Claude to summarise the discussion so far."""
     if not conversation_memory["key_points"]:
         return
     try:
         points = "\n".join(conversation_memory["key_points"])
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=200,
+            max_tokens=150,
             messages=[{
                 "role": "user",
-                "content": f"""Summarise the key themes and points from this discussion in 3-4 sentences. 
-Be specific — capture the actual arguments made, not generic descriptions.
+                "content": f"""Summarise the key themes from this discussion in 2-3 sentences. Be specific — capture actual arguments made.
 
-Discussion so far:
+Discussion:
 {points}
 
 Summary:"""
             }]
         )
         conversation_memory["summary"] = response.content[0].text
-        print(f"  [Memory updated: {conversation_memory['summary'][:80]}...]")
+        print(f"  [Memory: {conversation_memory['summary'][:80]}...]")
     except Exception as e:
-        print(f"  Memory update error: {e}")
+        print(f"  Memory error: {e}")
 
 def get_memory_context() -> str:
-    """Return memory context to inject into agent prompts."""
-    if not conversation_memory["summary"] and not conversation_memory["key_points"]:
-        return ""
-    
-    context = "\n--- DISCUSSION SO FAR ---\n"
+    context = ""
     if conversation_memory["summary"]:
-        context += f"Summary: {conversation_memory['summary']}\n"
-    
-    if conversation_memory["key_points"]:
-        recent = conversation_memory["key_points"][-5:]
-        context += "Recent points:\n" + "\n".join(recent) + "\n"
-    
-    context += "--- END CONTEXT ---\n"
+        context += f"\n--- DISCUSSION SUMMARY ---\n{conversation_memory['summary']}\n"
+    if conversation_memory["agent_points"]:
+        recent = conversation_memory["agent_points"][-8:]
+        context += "\nRecent agent contributions (DO NOT repeat these points):\n"
+        context += "\n".join(recent) + "\n--- END CONTEXT ---\n"
     return context
+
+# ── Substantive content filter ─────────────────────────────────────────────────
+def is_substantive(text: str) -> bool:
+    """Filter out procedural/admin speech before firing agents."""
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=10,
+            messages=[{
+                "role": "user",
+                "content": f"""Is this statement substantive enough for a panel of experts to comment on?
+It should contain an actual idea, claim, question or argument about fintech, AI, regulation, or business.
+It should NOT be: procedural ("let's start", "thank you", "can you summarise", "moving on"), meta-conversation, or just a name/greeting.
+
+Statement: "{text}"
+
+Reply with only YES or NO."""
+            }]
+        )
+        answer = response.content[0].text.strip().upper()
+        print(f"  [Filter: {answer} — {text[:60]}]")
+        return answer.startswith("YES")
+    except Exception:
+        return True  # Default to firing if filter fails
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
 def send_telegram(token: str, text: str):
@@ -187,47 +206,48 @@ def send_telegram(token: str, text: str):
 def get_agent_response(agent_key: str, new_segment: str, prior_responses: dict) -> str:
     agent = AGENTS[agent_key]
 
-    # Recent transcript context
-    context = "\n".join([f"{s['speaker']}: {s['text']}" for s in transcript_buffer[-5:]])
+    # Recent transcript
+    context = "\n".join([f"{s['speaker']}: {s['text']}" for s in transcript_buffer[-4:]])
 
-    # What other agents already said this round
+    # What other agents said THIS round
     other_responses = "\n".join([
         f"{AGENTS[k]['name']}: {v}"
         for k, v in prior_responses.items()
         if k != agent_key and v
     ])
-    other_context = f"\nOther panellists just said:\n{other_responses}\n" if other_responses else ""
+    other_context = (
+        f"\nOther panellists just said:\n{other_responses}\n\n"
+        "Prioritise responding directly to one of these points rather than just the transcript."
+    ) if other_responses else ""
 
-    # Persistent memory
     memory_context = get_memory_context()
 
     user_message = f"""{memory_context}
-Recent discussion:
+Live transcript:
 {context}
 
 Just said: {new_segment}
 {other_context}
-Respond as {agent['name']} in 2-3 sentences maximum. Be punchy and specific. Take a fresh angle — don't repeat anything already said."""
+IMPORTANT: Default to 1 sentence. Only use 2 sentences if genuinely necessary. Be direct. Do not repeat points already made."""
 
     try:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=90,
+            max_tokens=80,
             system=agent["system"],
             messages=[{"role": "user", "content": user_message}]
         )
-        return response.content[0].text
+        text = response.content[0].text
+        record_agent_point(agent["name"], text)
+        return text
     except Exception as e:
         print(f"Claude API error for {agent_key}: {e}")
         return None
 
 def agents_respond(segment_text: str, speaker: str):
-    """Four agents respond with slow, readable staggered timing."""
-
-    # Update memory
+    """Four agents respond with staggered timing."""
     update_memory(segment_text, speaker)
 
-    # Delays in seconds: 15, 35, 60, 90
     delays = {"lex": 15, "vera": 35, "dante": 60, "marco": 90}
     prior_responses = {}
     lock = threading.Lock()
@@ -276,7 +296,12 @@ def webhook():
 
             snippet = f"🎙️ *{last_speaker}:* {transcript_buffer[-1]['text']}"
             send_telegram(LEX_TOKEN, snippet)
-            agents_respond(recent_text, last_speaker)
+
+            if is_substantive(recent_text):
+                print(f"  [Substantive — firing agents]")
+                agents_respond(recent_text, last_speaker)
+            else:
+                print(f"  [Procedural — skipping]")
 
     return jsonify({"status": "ok"}), 200
 
@@ -296,6 +321,7 @@ def memory():
 def reset_memory():
     conversation_memory["summary"] = ""
     conversation_memory["key_points"] = []
+    conversation_memory["agent_points"] = []
     conversation_memory["segment_count"] = 0
     transcript_buffer.clear()
     return jsonify({"status": "memory reset"}), 200
