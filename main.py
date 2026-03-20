@@ -1,8 +1,17 @@
 """
-AgentSpaces Live
-----------------
-Receives real-time transcript segments from Deepgram (via local listen.py)
-and routes them to Lex, Vera, and Dante — three AI agents debating in a Telegram group.
+AgentSpaces Live — BDA Edition
+--------------------------------
+Four AI agents debating fintech, AI and AI Agents for the
+Bermuda Business Development Authority.
+
+Agents:
+  Lex Arbitrum    ⚖️  — Bermuda regulatory lens
+  Vera Capita     💼  — Commercial & business case
+  Dante Contrario 😈  — Devil's advocate
+  Marco Ventures  💰  — Investor voice
+
+Persistent memory: running conversation summary injected into
+each agent's context so they build on earlier discussion.
 """
 
 import os
@@ -15,104 +24,194 @@ from anthropic import Anthropic
 app = Flask(__name__)
 client = Anthropic()
 
-# ── Config from environment variables ────────────────────────────────────────
-TELEGRAM_GROUP_ID   = os.environ["TELEGRAM_GROUP_ID"]
-LEX_TOKEN           = os.environ["LEX_TOKEN"]
-VERA_TOKEN          = os.environ["VERA_TOKEN"]
-DANTE_TOKEN         = os.environ["DANTE_TOKEN"]
-FIREFLIES_API_KEY   = os.environ["FIREFLIES_API_KEY"]   # for verification
-ANTHROPIC_API_KEY   = os.environ["ANTHROPIC_API_KEY"]
+# ── Config ────────────────────────────────────────────────────────────────────
+TELEGRAM_GROUP_ID = os.environ["TELEGRAM_GROUP_ID"]
+LEX_TOKEN         = os.environ["LEX_TOKEN"]
+VERA_TOKEN        = os.environ["VERA_TOKEN"]
+DANTE_TOKEN       = os.environ["DANTE_TOKEN"]
+MARCO_TOKEN       = os.environ["MARCO_TOKEN"]
+ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
 
-# ── Agent Personas ────────────────────────────────────────────────────────────
+# ── Agent Personas ─────────────────────────────────────────────────────────────
 AGENTS = {
     "lex": {
         "token": LEX_TOKEN,
         "name": "Lex Arbitrum",
-        "system": """You are Lex Arbitrum, a regulatory and legal agent in a live meeting Telegram feed.
+        "emoji": "⚖️",
+        "system": """You are Lex Arbitrum, a Bermuda-qualified regulatory specialist participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
 
-STRICT RULES:
-- DEFAULT: 1 sentence only. Sharp and specific.
-- OCCASIONALLY (when the point genuinely requires it): up to 3-5 sentences max.
-- Never repeat a point already made in this conversation.
-- Never echo what Vera or Dante just said.
-- React ONLY to what was just said. Move on when the topic moves on.
-- Reference DABA, BMA, or law only when directly relevant.""",
-        "emoji": "⚖️"
+Your lens: The full range of BMA regulation and Bermuda law as it applies to fintech and AI — this includes insurance and reinsurance (Bermuda's historic strength), investment funds and asset management, banking and deposits, digital assets and DABA where relevant, AML/ATF compliance, economic substance requirements, sandbox and innovation frameworks, corporate governance, and the emerging question of how existing frameworks apply to AI agents and autonomous systems. You think across the whole BMA regulatory estate, not just digital assets.
+
+Your style:
+- Measured, precise, authoritative
+- 3-5 sentences per response — enough to make a real point, not so much it overwhelms
+- Reference specific Bermuda legislation or BMA guidance when relevant
+- Occasionally note where the law is unclear or hasn't kept up with technology
+- Build on what has been said earlier in the discussion — don't repeat points already made
+- You are aware this is a public forum with BDA officials, business leaders and investors present
+
+Never be dismissive. Be the voice of considered regulatory expertise."""
     },
     "vera": {
         "token": VERA_TOKEN,
         "name": "Vera Capita",
-        "system": """You are Vera Capita, a commercial agent in a live meeting Telegram feed.
+        "emoji": "💼",
+        "system": """You are Vera Capita, a commercial and deal structuring specialist participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
 
-STRICT RULES:
-- DEFAULT: 1 sentence only. Punchy and practical.
-- OCCASIONALLY (when the point genuinely requires it): up to 3-5 sentences max.
-- Never repeat a point already made in this conversation.
-- Never echo what Lex or Dante just said.
-- React ONLY to what was just said. Move on when the topic moves on.
-- Focus on deal structure, revenue, or market opportunity.""",
-        "emoji": "💼"
+Your lens: Business models, revenue, market opportunity, deal structure, partnership strategy, and commercial viability. You think about who pays, who benefits, and how to build sustainable businesses in this space.
+
+Your style:
+- Sharp, practical, commercially focused
+- 3-5 sentences per response
+- Translate abstract regulatory or technology points into commercial reality
+- Challenge assumptions about monetisation and market size
+- Build on what has been said earlier — advance the conversation, don't repeat it
+- You are aware this is a BDA forum — Bermuda's economic development is relevant context
+
+Be the voice that asks: what's the actual business here and who is going to pay for it?"""
     },
     "dante": {
         "token": DANTE_TOKEN,
         "name": "Dante Contrario",
-        "system": """You are Dante Contrario, a devil's advocate in a live meeting Telegram feed.
+        "emoji": "😈",
+        "system": """You are Dante Contrario, a devil's advocate participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
 
-STRICT RULES:
-- DEFAULT: 1 sentence only. Provocative and intelligent.
-- OCCASIONALLY (when the point genuinely requires it): up to 3-5 sentences max.
-- Never repeat a point already made — especially your own previous points.
-- Never echo what Lex or Vera just said.
-- React ONLY to what was just said. Drop old topics completely.
-- Find a fresh angle every time.""",
-        "emoji": "😈"
+Your role: Challenge every assumption. Find the weakness in every argument. Ask the uncomfortable question nobody else is asking. You are not cynical for its own sake — you are intellectually rigorous and force better thinking.
+
+Your style:
+- Provocative but intelligent — 3-5 sentences
+- Never accept the premise at face value
+- Find the gap, the unintended consequence, the hidden assumption
+- Occasionally agree with a point but immediately complicate it
+- Build on the discussion — your best provocations respond to what Lex or Vera just said
+- You are aware this is a serious BDA forum — your challenges should be substantive, not flippant
+
+Be the voice that makes everyone think harder."""
+    },
+    "marco": {
+        "token": MARCO_TOKEN,
+        "name": "Marco Ventures",
+        "emoji": "💰",
+        "system": """You are Marco Ventures, an investor and venture capital specialist participating in a live panel discussion at the Bermuda Business Development Authority on fintech, AI and AI Agents.
+
+Your lens: Where is smart money flowing in AI, fintech and digital assets? What are investors actually funding, what are they avoiding, and what does Bermuda need to do to attract serious capital? You have a global view — you see deals across Singapore, UAE, Cayman, London and New York.
+
+Your style:
+- Confident, data-aware, globally informed
+- 3-5 sentences per response
+- Reference real investment trends, funding rounds, or market movements where relevant
+- Compare Bermuda's position to competing jurisdictions honestly
+- Build on the discussion — connect regulatory and commercial points to investor reality
+- You are here because you are genuinely interested in Bermuda as a jurisdiction for AI and fintech capital
+
+Be the voice that connects this discussion to where real capital is actually going."""
     }
 }
 
-# ── Transcript buffer (stores recent transcript for context) ──────────────────
-transcript_buffer = []
-MAX_BUFFER = 20  # keep last 20 segments for context
+# ── Persistent conversation memory ────────────────────────────────────────────
+conversation_memory = {
+    "summary": "",           # Running summary of the discussion so far
+    "key_points": [],        # List of key points made
+    "segment_count": 0       # How many segments processed
+}
 
+transcript_buffer = []
+MAX_BUFFER = 30
+
+def update_memory(new_segment: str, speaker: str):
+    """Update the running conversation summary after each segment."""
+    conversation_memory["segment_count"] += 1
+    conversation_memory["key_points"].append(f"{speaker}: {new_segment}")
+
+    # Keep key points to last 10
+    if len(conversation_memory["key_points"]) > 10:
+        conversation_memory["key_points"] = conversation_memory["key_points"][-10:]
+
+    # Every 5 segments, regenerate the summary using Claude
+    if conversation_memory["segment_count"] % 5 == 0:
+        threading.Thread(target=regenerate_summary, daemon=True).start()
+
+def regenerate_summary():
+    """Ask Claude to summarise the discussion so far."""
+    if not conversation_memory["key_points"]:
+        return
+    try:
+        points = "\n".join(conversation_memory["key_points"])
+        response = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=200,
+            messages=[{
+                "role": "user",
+                "content": f"""Summarise the key themes and points from this discussion in 3-4 sentences. 
+Be specific — capture the actual arguments made, not generic descriptions.
+
+Discussion so far:
+{points}
+
+Summary:"""
+            }]
+        )
+        conversation_memory["summary"] = response.content[0].text
+        print(f"  [Memory updated: {conversation_memory['summary'][:80]}...]")
+    except Exception as e:
+        print(f"  Memory update error: {e}")
+
+def get_memory_context() -> str:
+    """Return memory context to inject into agent prompts."""
+    if not conversation_memory["summary"] and not conversation_memory["key_points"]:
+        return ""
+    
+    context = "\n--- DISCUSSION SO FAR ---\n"
+    if conversation_memory["summary"]:
+        context += f"Summary: {conversation_memory['summary']}\n"
+    
+    if conversation_memory["key_points"]:
+        recent = conversation_memory["key_points"][-5:]
+        context += "Recent points:\n" + "\n".join(recent) + "\n"
+    
+    context += "--- END CONTEXT ---\n"
+    return context
+
+# ── Telegram ──────────────────────────────────────────────────────────────────
 def send_telegram(token: str, text: str):
-    """Send a message to the Telegram group."""
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_GROUP_ID,
-        "text": text,
-        "parse_mode": "Markdown"
-    }
+    payload = {"chat_id": TELEGRAM_GROUP_ID, "text": text, "parse_mode": "Markdown"}
     try:
         r = requests.post(url, json=payload, timeout=10)
         r.raise_for_status()
     except Exception as e:
-        print(f"Telegram send error: {e}")
+        print(f"Telegram error: {e}")
 
+# ── Agent responses ────────────────────────────────────────────────────────────
 def get_agent_response(agent_key: str, new_segment: str, prior_responses: dict) -> str:
-    """Ask Claude to respond as a given agent persona."""
     agent = AGENTS[agent_key]
-    
-    # Only use last 3 segments — keeps agents focused on NOW
-    context = "\n".join([f"{s['speaker']}: {s['text']}" for s in transcript_buffer[-3:]])
-    
-    # Show what other agents already said so this agent doesn't repeat them
+
+    # Recent transcript context
+    context = "\n".join([f"{s['speaker']}: {s['text']}" for s in transcript_buffer[-5:]])
+
+    # What other agents already said this round
     other_responses = "\n".join([
         f"{AGENTS[k]['name']}: {v}"
         for k, v in prior_responses.items()
         if k != agent_key and v
     ])
-    other_context = f"\nOther agents already said:\n{other_responses}\n" if other_responses else ""
+    other_context = f"\nOther panellists just said:\n{other_responses}\n" if other_responses else ""
 
-    user_message = f"""Recent transcript:
+    # Persistent memory
+    memory_context = get_memory_context()
+
+    user_message = f"""{memory_context}
+Recent discussion:
 {context}
 
 Just said: {new_segment}
 {other_context}
-Respond as {agent['name']}. DEFAULT to 1 sentence. Take a fresh angle — don't repeat anything above."""
+Respond as {agent['name']} in 3-5 sentences. Build on the discussion. Take a fresh angle — don't repeat anything already said."""
 
     try:
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=120,
+            max_tokens=180,
             system=agent["system"],
             messages=[{"role": "user", "content": user_message}]
         )
@@ -122,10 +221,14 @@ Respond as {agent['name']}. DEFAULT to 1 sentence. Take a fresh angle — don't 
         return None
 
 def agents_respond(segment_text: str, speaker: str):
-    """Have all three agents respond with staggered timing, sharing prior responses."""
-    
-    delays = {"lex": 5, "vera": 18, "dante": 32}
-    prior_responses = {}  # Accumulates as each agent responds
+    """Four agents respond with slow, readable staggered timing."""
+
+    # Update memory
+    update_memory(segment_text, speaker)
+
+    # Delays in seconds: 15, 35, 60, 90
+    delays = {"lex": 15, "vera": 35, "dante": 60, "marco": 90}
+    prior_responses = {}
     lock = threading.Lock()
 
     def respond(agent_key, delay):
@@ -145,72 +248,68 @@ def agents_respond(segment_text: str, speaker: str):
         t.daemon = True
         t.start()
 
-# ── Webhook endpoint ──────────────────────────────────────────────────────────
+# ── Webhook ───────────────────────────────────────────────────────────────────
 @app.route("/webhook", methods=["POST"])
-def deepgram_webhook():
-    """Receive real-time transcript segments from Deepgram via local listen.py."""
+def webhook():
     data = request.json
-    
     if not data:
         return jsonify({"status": "no data"}), 400
-    
-    print(f"Webhook received: {data}")
-    
-    # listen.py posts TranscriptSegment events
+
     event_type = data.get("eventType", "")
-    
-    # Handle real-time segment events from Deepgram
+
     if event_type in ["Transcription", "TranscriptSegment", "transcript_ready"]:
-        
-        # Extract transcript data (Deepgram format via listen.py)
         transcript = data.get("transcript", {})
         sentences = transcript.get("sentences", [])
-        
+
         if sentences:
-            # Process new sentences
             for sentence in sentences:
                 speaker = sentence.get("speaker_name", "Speaker")
                 text = sentence.get("text", "")
-                
                 if text:
-                    segment = {"speaker": speaker, "text": text}
-                    transcript_buffer.append(segment)
-                    
-                    # Keep buffer manageable
+                    transcript_buffer.append({"speaker": speaker, "text": text})
                     if len(transcript_buffer) > MAX_BUFFER:
                         transcript_buffer.pop(0)
-            
-            # Take the last meaningful chunk and have agents respond
+
             recent_text = " ".join([s["text"] for s in transcript_buffer[-3:]])
             last_speaker = transcript_buffer[-1]["speaker"] if transcript_buffer else "Speaker"
-            
-            # Post transcript snippet to group first
+
             snippet = f"🎙️ *{last_speaker}:* {transcript_buffer[-1]['text']}"
-            # Use Lex's token just to post the transcript (neutral poster)
             send_telegram(LEX_TOKEN, snippet)
-            
-            # Then have agents respond
             agents_respond(recent_text, last_speaker)
-    
+
     return jsonify({"status": "ok"}), 200
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "AgentSpaces Live is running"}), 200
+    return jsonify({
+        "status": "AgentSpaces Live is running",
+        "memory_segments": conversation_memory["segment_count"],
+        "memory_summary": conversation_memory["summary"][:100] if conversation_memory["summary"] else "none"
+    }), 200
+
+@app.route("/memory", methods=["GET"])
+def memory():
+    return jsonify(conversation_memory), 200
+
+@app.route("/memory/reset", methods=["POST"])
+def reset_memory():
+    conversation_memory["summary"] = ""
+    conversation_memory["key_points"] = []
+    conversation_memory["segment_count"] = 0
+    transcript_buffer.clear()
+    return jsonify({"status": "memory reset"}), 200
 
 @app.route("/test", methods=["POST"])
 def test_agents():
-    """Test endpoint — fire a sample transcript segment to see agents respond."""
     data = request.json or {}
-    text = data.get("text", "We need to decide whether to register this token offering under DABA or structure it as an exemption. The timeline is tight — client wants to launch in 60 days.")
+    text = data.get("text", "Bermuda has a unique opportunity to become the global hub for AI agent incorporation — but only if the regulatory framework keeps pace with the technology.")
     speaker = data.get("speaker", "BC")
-    
-    segment = {"speaker": speaker, "text": text}
-    transcript_buffer.append(segment)
-    
+
+    transcript_buffer.append({"speaker": speaker, "text": text})
+    update_memory(text, speaker)
     send_telegram(LEX_TOKEN, f"🎙️ *{speaker}:* {text}")
     agents_respond(text, speaker)
-    
+
     return jsonify({"status": "test fired", "text": text}), 200
 
 if __name__ == "__main__":
