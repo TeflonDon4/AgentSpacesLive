@@ -179,7 +179,7 @@ def is_substantive(text: str) -> bool:
                 "role": "user",
                 "content": f"""Is this statement substantive enough for a panel of experts to comment on?
 It should contain an actual idea, claim, question or argument about fintech, AI, regulation, or business.
-It should NOT be: procedural ("let's start", "thank you", "can you summarise", "moving on"), meta-conversation, or just a name/greeting.
+It should NOT be: very short procedural phrases ("let's start", "thank you", "moving on"), greetings, or requests for someone to speak. Questions about AI, regulation, fintech, or Bermuda policy ARE substantive even if they are phrased as questions.
 
 Statement: "{text}"
 
