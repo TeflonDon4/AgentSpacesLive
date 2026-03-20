@@ -179,7 +179,7 @@ def is_substantive(text: str) -> bool:
                 "role": "user",
                 "content": f"""Is this statement substantive enough for a panel of experts to comment on?
 It should contain an actual idea, claim, question or argument about fintech, AI, regulation, or business.
-It should NOT be: very short procedural phrases ("let's start", "thank you", "moving on"), greetings, or requests for someone to speak. Questions about AI, regulation, fintech, or Bermuda policy ARE substantive even if they are phrased as questions.
+It should NOT be: procedural ("let's start", "thank you", "can you summarise", "moving on"), meta-conversation, or just a name/greeting.
 
 Statement: "{text}"
 
@@ -296,12 +296,7 @@ def webhook():
 
             snippet = f"🎙️ *{last_speaker}:* {transcript_buffer[-1]['text']}"
             send_telegram(LEX_TOKEN, snippet)
-
-            if is_substantive(recent_text):
-                print(f"  [Substantive — firing agents]")
-                agents_respond(recent_text, last_speaker)
-            else:
-                print(f"  [Procedural — skipping]")
+            agents_respond(recent_text, last_speaker)
 
     return jsonify({"status": "ok"}), 200
 
